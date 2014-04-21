@@ -1,5 +1,7 @@
 \documentclass{acm_proc_article-sp}
 
+\usepackage{url}
+
 \begin{document}
 
 \title{NDN Repo: An NDN Persistent Storage Model}
@@ -10,10 +12,10 @@
 % 1st. author
 \alignauthor
 Shuo Chen\\
-  \affaddr{Research Institue of Information}\\
-  \affaddr{Tsinghua University}\\
-  \affaddr{Beijing, China}\\
-  \email{chenatu2006@gmail.com}
+	\affaddr{Research Institue of Information}\\
+	\affaddr{Tsinghua University}\\
+	\affaddr{Beijing, China}\\
+	\email{chenatu2006@gmail.com}
 }
 \maketitle
 
@@ -24,6 +26,26 @@ In this paper, details of NDN repo specification are demonstrated and an initial
 \end{abstract}
 
 \section{Introduction}
+Named Data Networking (NDN) \cite{zhang2010named} is a data-orientd network architecture which replaces ip with data names as narrow waist of networking. The essential evolution of NDN is the change of network behavior from delivering data to a certain destination to fetching data with a given name. \cite{zhang2010named} Because of this change, \title{interest} and \title{content object} are two kinds of network packet for fetching and returning data of given name. \title{Interest} is the request of data containing prefix of name and other constraints of data. Besides the content of data, content object also contains the complete name and signature of data.
 
+Naming and signature of data makes in-network storage possible because of the following reason. Network packet in named by source and destination host addresses in IP network, while name of NDN packet is irrelavent with physical endpoints. Any host in NDN network carring data of given name can response to the \title{interest}, but hosts besides source and destination cannot retrieve in-network IP packet. Another concern is the privacy of in-network data. Signature in data packet is to resolve authentication and confidentiality of data. \title{Content Store (CS)} is cache of data packet in NDN router model and it is within network layer. NDN repository (Repo for short) is persistent NDN storage model. It is an application conforming to NDN protocol and can be used as storage functional components by other NDN applications such as video streaming and CDN like applications.
+
+\title{Ccnr} proposed by Project CCNx just provides read and write access of content object. It does not support deletion of content object and does not provide validation and access control. Compared to CCNx Repository Protocols \cite{ccnr}, a more functional specification is proposed to provides remote operations of repo in this paper. Three basic functions including retrieving, inserting and deleting \title{content objects} are supported in addition with check of insertion and deletion progress. The specification provides semantics of command to support remote cotrol over repo and signature of command to support validation and access control.
+
+An implementaion of NDN repo protocol called repo-ng (repo of new generation) is also demonstrated in this paper. Repo-ng is based on ndn-cpp library and sqlite3. Its backend storage is built on sqlite3 database. Wired format data packet is directy stored in database. repo-ng uses hierarchical trust model referred to NDN testbed. \cite{ndn-key} Repo-ng also gives medium granularity of access control.
+
+The rest of the paper is organized as follows...
+
+\section{NDN REPO PROTOCOL DESIGN}
+
+\section{REPO-NG DESIGN}
+
+\section{EVALUTATION OF REPO-NG}
+
+\section{CONCLUSION AND FUTURE WORK}
+
+\bibliographystyle{abbrv}
+\bibliography{repo}
 
 \end{document}
+
