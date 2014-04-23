@@ -1,6 +1,6 @@
 \documentclass{acm_proc_article-sp}
 
-\usepackage{url}
+\usepackage{url, fancyvrb}
 
 \begin{document}
 
@@ -26,17 +26,59 @@ In this paper, details of NDN repo specification are demonstrated and an initial
 \end{abstract}
 
 \section{Introduction}
-Named Data Networking (NDN) \cite{zhang2010named} is a data-orientd network architecture which replaces ip with data names as narrow waist of networking. The essential evolution of NDN is the change of network behavior from delivering data to a certain destination to fetching data with a given name. \cite{zhang2010named} Because of this change, \title{interest} and \title{content object} are two kinds of network packet for fetching and returning data of given name. \title{Interest} is the request of data containing prefix of name and other constraints of data. Besides the content of data, content object also contains the complete name and signature of data.
+Named Data Networking (NDN) \cite{zhang2010named} is a data-orientd network architecture which replaces ip with data names as narrow waist of networking. The essential evolution of NDN is the change of network behavior from delivering data to a certain destination to fetching data with a given name. \cite{zhang2010named} Because of this change, \emph{interest} and \emph{content object} are two kinds of network packet for fetching and returning data of given name. \emph{Interest} is the request of data containing prefix of name and other constraints of data. Besides the content of data, content object also contains the complete name and signature of data.
 
-Naming and signature of data makes in-network storage possible because of the following reason. Network packet in named by source and destination host addresses in IP network, while name of NDN packet is irrelavent with physical endpoints. Any host in NDN network carring data of given name can response to the \title{interest}, but hosts besides source and destination cannot retrieve in-network IP packet. Another concern is the privacy of in-network data. Signature in data packet is to resolve authentication and confidentiality of data. \title{Content Store (CS)} is cache of data packet in NDN router model and it is within network layer. NDN repository (Repo for short) is persistent NDN storage model. It is an application conforming to NDN protocol and can be used as storage functional components by other NDN applications such as video streaming and CDN like applications.
+Naming and signature of data makes in-network storage possible because of the following reason. Network packet in named by source and destination host addresses in IP network, while name of NDN packet is irrelavent with physical endpoints. Any host in NDN network carring data of given name can response to the \emph{interest}, but hosts besides source and destination cannot retrieve in-network IP packet. Another concern is the privacy of in-network data. Signature in data packet is to resolve authentication and confidentiality of data. \emph{Content Store (CS)} is cache of data packet in NDN router model and it is within network layer. NDN repository (Repo for short) is persistent NDN storage model. It is an application conforming to NDN protocol and can be used as storage functional components by other NDN applications such as video streaming and CDN like applications.
 
-\title{Ccnr} proposed by Project CCNx just provides read and write access of content object. It does not support deletion of content object and does not provide validation and access control. Compared to CCNx Repository Protocols \cite{ccnr}, a more functional specification is proposed to provides remote operations of repo in this paper. Three basic functions including retrieving, inserting and deleting \title{content objects} are supported in addition with check of insertion and deletion progress. The specification provides semantics of command to support remote cotrol over repo and signature of command to support validation and access control.
+\emph{Ccnr} proposed by Project CCNx just provides read and write access of content object. It does not support deletion of content object and does not provide validation and access control. Compared to CCNx Repository Protocols \cite{ccnr}, a more functional specification is proposed to provides remote operations of repo in this paper. Three basic functions including retrieving, inserting and deleting \emph{content objects} are supported in addition with check of insertion and deletion progress. The specification provides semantics of command to support remote cotrol over repo and signature of command to support validation and access control.
 
-An implementaion of NDN repo protocol called repo-ng (repo of new generation) is also demonstrated in this paper. Repo-ng is based on ndn-cpp library and sqlite3. Its backend storage is built on sqlite3 database. Wired format data packet is directy stored in database. repo-ng uses hierarchical trust model referred to NDN testbed. \cite{ndn-key} Repo-ng also gives medium granularity of access control.
+An implementaion of NDN repo protocol called \emph{repo-ng} (repo of new generation) is also demonstrated in this paper. Repo-ng is based on ndn-cpp library and sqlite3. Its backend storage is built on sqlite3 database. Wired format data packet is directy stored in database. \emph{repo-ng} uses hierarchical trust model referred to NDN testbed. \cite{ndn-key} \emph{Repo-ng} also gives medium granularity of access control.
 
 The rest of the paper is organized as follows...
 
 \section{NDN REPO PROTOCOL DESIGN}
+\subsection{Overview}
+A repo supports the network by preserving content and responding to \emph{interests} requesting content that it holds. A Repo can exist in any node, and is recommended if applications in that node need to preserve data. The NDN repo protocol is a specification of repo operations including reading, insertion and deletion of \emph{content objects} in repo. Compared to \emph{ccnr} proposed in Project CCNx, insertion and deletion are supported in this protocol by \emph{repo command}. Although validation trust model and access control of \emph{repo command} are not stipulated, an example is given in the following implementation \emph{repo-ng}.
+
+Retrieving data from repo is just like common ways of retrieving data from NDN network. \emph{Repo command} based on command interest with signed commponents is used to support insertion and deletion function. Validation and access control can be desinged based on signed commponents. A new repo semantics different from NDN semantics is defined for repo command.
+
+\subsection{Retrieving Data}
+Repo registers prefixes of data objects it holds into NDN fowarding deamon (NFD) and the repo will respond the data with such prefixes. A standard interest is used to fetch content from the repo. The repo will respond when the name of the interest matches the prefix it registered in NFD. If the content in repo matches the interests, it will respond with the \emph{content object}. When the interest is not matched, it will not respond. The following figures shows the process of retrieving data.
+
+\begin{figure}
+\centering
+\begin{BVerbatim}
+Requester                     Repo
+    |                           |
+    |                           |
+    |         Interest          |
+ t1 |-------------------------->|
+    |                           |
+    |        Data Object        |
+ t2 |<==========================|
+    |                           |
+    |                           |
+    |                           |
+\end{BVerbatim}
+\caption{Fetch data that matches in repo}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{BVerbatim}
+Requester                     Repo
+    |                           |
+    |                           |
+    |         Interest          |
+ t1 |-------------------------->|
+    |                           |
+    |                           |
+    |                           |
+\end{BVerbatim}
+\caption{Fetch data that does not match in repo}
+\end{figure}
+
+\subsection{Repo Command and Repo Cammand Response}
 
 \section{REPO-NG DESIGN}
 
