@@ -1,6 +1,6 @@
 \documentclass{acm_proc_article-sp}
 
-\usepackage{url, fancyvrb}
+\usepackage{url, fancyvrb, framed}
 
 \begin{document}
 
@@ -12,7 +12,7 @@
 % 1st. author
 \alignauthor
 Shuo Chen\\
-	\affaddr{Research Institue of Information}\\
+	\affaddr{Research Institute of Information}\\
 	\affaddr{Tsinghua University}\\
 	\affaddr{Beijing, China}\\
 	\email{chenatu2006@gmail.com}
@@ -20,19 +20,19 @@ Shuo Chen\\
 \maketitle
 
 \begin{abstract}
-NDN repository (Repo for short) is persistent storage model of Named Data Networking NDN compared with NDN Content Store. NDN makes in-netork storage possible because of naming and signature of network layer data packet. NDN repo is not a built-in part of NDN, but built upon application layer without tweaking NDN protocol. A specification of NDN Repo is designed to standarize repo operation interfaces. Fetching, insertion and deletion of data objects are supported in this specification and basic semantics of repo commands is defined.
+NDN repository (Repo for short) is persistent storage model of Named Data Networking NDN compared with NDN Content Store. NDN makes in-network storage possible because of naming and signature of network layer data packet. NDN repo is not a built-in part of NDN, but built upon application layer without tweaking NDN protocol. A specification of NDN Repo is designed to standardize repo operation interfaces. Fetching, insertion and deletion of data objects are supported in this specification and basic semantics of repo commands is defined.
 
 In this paper, details of NDN repo specification are demonstrated and an initial implementation based on ndn-cpp library and sqlite3 is presented. (Something about the evaluation results)
 \end{abstract}
 
 \section{Introduction}
-Named Data Networking (NDN) \cite{zhang2010named} is a data-orientd network architecture which replaces ip with data names as narrow waist of networking. The essential evolution of NDN is the change of network behavior from delivering data to a certain destination to fetching data with a given name. \cite{zhang2010named} Because of this change, \emph{interest} and \emph{content object} are two kinds of network packet for fetching and returning data of given name. \emph{Interest} is the request of data containing prefix of name and other constraints of data. Besides the content of data, content object also contains the complete name and signature of data.
+Named Data Networking (NDN) \cite{zhang2010named} is a data-oriented network architecture which replaces ip with data names as narrow waist of networking. The essential evolution of NDN is the change of network behavior from delivering data to a certain destination to fetching data with a given name. \cite{zhang2010named} Because of this change, \emph{interest} and \emph{content object} are two kinds of network packet for fetching and returning data of given name. \emph{Interest} is the request of data containing prefix of name and other constraints of data. Besides the content of data, content object also contains the complete name and signature of data.
 
-Naming and signature of data makes in-network storage possible because of the following reason. Network packet in named by source and destination host addresses in IP network, while name of NDN packet is irrelavent with physical endpoints. Any host in NDN network carring data of given name can response to the \emph{interest}, but hosts besides source and destination cannot retrieve in-network IP packet. Another concern is the privacy of in-network data. Signature in data packet is to resolve authentication and confidentiality of data. \emph{Content Store (CS)} is cache of data packet in NDN router model and it is within network layer. NDN repository (Repo for short) is persistent NDN storage model. It is an application conforming to NDN protocol and can be used as storage functional components by other NDN applications such as video streaming and CDN like applications.
+Naming and signature of data makes in-network storage possible because of the following reason. Network packet in named by source and destination host addresses in IP network, while name of NDN packet is irrelevant with physical endpoints. Any host in NDN network carrying data of given name can response to the \emph{interest}, but hosts besides source and destination cannot retrieve in-network IP packet. Another concern is the privacy of in-network data. Signature in data packet is to resolve authentication and confidentiality of data. \emph{Content Store (CS)} is cache of data packet in NDN router model and it is within network layer. NDN repository (Repo for short) is persistent NDN storage model. It is an application conforming to NDN protocol and can be used as storage functional components by other NDN applications such as video streaming and CDN like applications.
 
-\emph{Ccnr} proposed by Project CCNx just provides read and write access of content object. It does not support deletion of content object and does not provide validation and access control. Compared to CCNx Repository Protocols \cite{ccnr}, a more functional specification is proposed to provides remote operations of repo in this paper. Three basic functions including retrieving, inserting and deleting \emph{content objects} are supported in addition with check of insertion and deletion progress. The specification provides semantics of command to support remote cotrol over repo and signature of command to support validation and access control.
+\emph{Ccnr} proposed by Project CCNx just provides read and write access of content object. It does not support deletion of content object and does not provide validation and access control. Compared to CCNx Repository Protocols \cite{ccnr}, a more functional specification is proposed to provides remote operations of repo in this paper. Three basic functions including retrieving, inserting and deleting \emph{content objects} are supported in addition with check of insertion and deletion progress. The specification provides semantics of command to support remote control over repo and signature of command to support validation and access control.
 
-An implementaion of NDN repo protocol called \emph{repo-ng} (repo of new generation) is also demonstrated in this paper. Repo-ng is based on ndn-cpp library and sqlite3. Its backend storage is built on sqlite3 database. Wired format data packet is directy stored in database. \emph{repo-ng} uses hierarchical trust model referred to NDN testbed. \cite{ndn-key} \emph{Repo-ng} also gives medium granularity of access control.
+An implementation of NDN repo protocol called \emph{repo-ng} (repo of new generation) is also demonstrated in this paper. Repo-ng is based on ndn-cpp library and sqlite3. Its backend storage is built on sqlite3 database. Wired format data packet is directly stored in database. \emph{repo-ng} uses hierarchical trust model referred to NDN testbed. \cite{ndn-key} \emph{Repo-ng} also gives medium granularity of access control.
 
 The rest of the paper is organized as follows...
 
@@ -40,10 +40,10 @@ The rest of the paper is organized as follows...
 \subsection{Overview}
 A repo supports the network by preserving content and responding to \emph{interests} requesting content that it holds. A Repo can exist in any node, and is recommended if applications in that node need to preserve data. The NDN repo protocol is a specification of repo operations including reading, insertion and deletion of \emph{content objects} in repo. Compared to \emph{ccnr} proposed in Project CCNx, insertion and deletion are supported in this protocol by \emph{repo command}. Although validation trust model and access control of \emph{repo command} are not stipulated, an example is given in the following implementation \emph{repo-ng}.
 
-Retrieving data from repo is just like common ways of retrieving data from NDN network. \emph{Repo command} based on command interest with signed commponents is used to support insertion and deletion function. Validation and access control can be desinged based on signed commponents. A new repo semantics different from NDN semantics is defined for repo command.
+Retrieving data from repo is just like common ways of retrieving data from NDN network. \emph{Repo command} based on command interest with signed components is used to support insertion and deletion function. Validation and access control can be designed based on signed components. A new repo semantics different from NDN semantics is defined for repo command.
 
 \subsection{Retrieving Data}
-Repo registers prefixes of data objects it holds into NDN fowarding deamon (NFD) and the repo will respond the data with such prefixes. A standard interest is used to fetch content from the repo. The repo will respond when the name of the interest matches the prefix it registered in NFD. If the content in repo matches the interests, it will respond with the \emph{content object}. When the interest is not matched, it will not respond. The following figures shows the process of retrieving data.
+Repo registers prefixes of data objects it holds into NDN forwarding daemon (NFD) and the repo will respond the data with such prefixes. A standard interest is used to fetch content from the repo. The repo will respond when the name of the interest matches the prefix it registered in NFD. If the content in repo matches the interests, it will respond with the \emph{content object}. When the interest is not matched, it will not respond. The following figures shows the process of retrieving data.
 
 \begin{figure}
 \centering
@@ -78,7 +78,147 @@ Requester                     Repo
 \caption{Fetch data that does not match in repo}
 \end{figure}
 
-\subsection{Repo Command and Repo Cammand Response}
+\subsection{Repo Command and Repo Command Response}
+Four types of commands are supported in repo protocol: insertion, deletion, insertion progress check and deletion progress check. Repo command is a kind of interest based on semantics of signed command interests. Repo command response is a specific type of NDN data packet conforming to the following specification.
+
+\subsubsection{Background}
+NDN packets are encoded in a Type-Length-Value (TLV) format. One TLV block can be nested with servral sub TLV bocks and the length of each TLV block is variable. The type of block is defined in the first few octets and the length of block is set subsequently. Wired format of name is just a sub TLV block of interest and all the components of name are nested in the name block.
+
+Repo command interests are based on signed command interests. Signed command interests are used for authentication. The signed command interests not only contain cryptographic signature, but also ensure uniqueness of each command. The following name is a typical structure of name of singed comman interest:
+
+\begin{figure*}[htbp]
+\centering
+\begin{framed}
+\begin{BVerbatim}
+ /signed/interest/name/<timestamp>/<random-value>/<SignatureInfo>/<SignatureValue>
+                       \                                                         /
+                        -------------------------  ------------------------------
+                                                \/
+                              Additional components of Command Interest 
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+The first three components are the actual content of content. n denotes the count of components of name. The n-3th is the timestamp of command to protect replay attack. The n-2th is random value that guarantee the uniqueness of the command. The n and n-1th components are signature and signature info of the interest for validation.
+
+\subsubsection{Repo Command}
+For insertion, deletion and other operations of repo, these commands are encoded in the form of signed command interest. The semantics of repo command interest is as follows:
+
+The name semantics is defined to have following components:
+\begin{itemize}
+\item <repo prefix> refers to specific prefix repo is listening
+\item <command verb> refers to the name of command
+\item <RepoCommandParameter> refers to parameters of repo command
+\end{itemize}
+
+The following components are components of singed interest for access control:
+\begin{itemize}
+\item <timestamp>
+\item <random-value>
+\item <SignatureInfo>
+\item <SignatureValue>
+\end{itemize}
+
+For prefix of repo /ucla/cs/repo/, the command will be defined as this:
+
+\begin{figure*}
+\begin{framed}
+\begin{BVerbatim}
+/ucla/cs/repo/<command verb>/<RepoCommandParameter>/<timestamp>/<random-value>/<SignatureInfo>
+/<SignatureValue>
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+The RepoCommandParatmeter component is also nested with sub TLV component. It defines as follows:
+
+\begin{figure*}
+\begin{framed}
+\begin{BVerbatim}
+RepoCommandParameter ::= REPOCOMMANDPARAMETER-TYPE TLV-LENGTH
+                           Name?
+                           Selectors?
+                           StartBlockId?
+                           EndBlockId?
+                           ProcessId?
+
+Name                  ::= NAME-TYPE TLV-LENGTH NameComponent*
+NameComponent         ::= NAME-COMPONENT-TYPE TLV-LENGTH BYTE+
+
+Selectors             ::= SELECTORS-TYPE TLV-LENGTH
+                           MinSuffixComponents?
+                           MaxSuffixComponents?
+                           PublisherPublicKeyLocator?
+                           Exclude?
+                           ChildSelector?
+
+MinSuffixComponents   ::= MIN-SUFFIX-COMPONENTS-TYPE TLV-LENGTH
+                           nonNegativeInteger
+
+MaxSuffixComponents   ::= MAX-SUFFIX-COMPONENTS-TYPE TLV-LENGTH
+                           nonNegativeInteger
+
+PublisherPublicKeyLocator ::= KeyLocator
+
+Exclude               ::= EXCLUDE-TYPE TLV-LENGTH Any? (NameComponent (Any)?)+
+Any                   ::= ANY-TYPE TLV-LENGTH(=0)
+
+ChildSelector         ::= CHILD-SELECTOR-TYPE TLV-LENGTH
+                           nonNegativeInteger
+
+StartBlockId          ::= STARTBLOCKID-TYPE TLV-LENGTH
+                           nonNegativeInteger
+
+EndBlockId            ::= ENDBLOCKID-TYPE TLV-LENGTH
+                           nonNegativeInteger
+
+ProcessId             ::= PROCESSID-TYPE TLV-LENGTH
+                           nonNegativeInteger
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+Name adopts the same TLV structure of name of interest and data packet. This name denotes the name of possessed data. Selectors adopt the same TLV structure of selector. However, only parts of selectors including MinSuffixComponents, MaxSuffixComponents, PublisherPublicKeyLocator, Exclude, ChildSelector are used in repo command parameter. The meaning of selectors is not the same in different operations which will be discussed in the following sections. StartBlockId and EndBlockId denotes the beginning and end of segment number to support segmented insertion and deletion. ProcessId is a random number generated to identify operation process. It is used for insertion and deletion progress check.
+
+\subsubsection{Repo Command Response}
+Repo command response is the response data packet of repo command interest. The response contains statuscode to indicate the status of command process and other information. A TLV-encoded block called RepoCommandResponse is encoded in content of the data packet. It defines as follows:
+
+\begin{figure*}
+\begin{framed}
+\begin{BVerbatim}
+RepoCommandResponse   ::= INSERTSTATUS-TYPE TLV-LENGTH
+                           ProcessId?
+                           StatusCode
+                           StartBlockId?
+                           EndBlockId?
+                           InsertNum?
+                           DeleteNum?
+
+ProcessId             ::= PROCESSID-TYPE TLV-LENGTH
+                            nonNegativeInteger 
+
+StatusCode            ::= STATUSCODE-TYPE TLV-LENGTH
+                            nonNegativeInteger    
+
+StartBlockId          ::= STARTBLOCKID-TYPE TLV-LENGTH
+                            nonNegativeInteger
+
+EndBlockId            ::= ENDBLOCKID-TYPE TLV-LENGTH
+                            nonNegativeInteger
+
+InsertNum             ::= INSERTNUM-TYPE TLV-LENGTH
+                            nonNegativeInteger
+
+DeleteNum             ::= DELETENUM-TYPE TLV-LENGTH
+                            nonNegativeInteger
+
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+The TLV structure and meaning of Name, ProcessId, StartBlockId, and EndBlockId are just like those of RepoCommandParameter. InsertNum is the count of data inserted. DeleteNum is the count of data deleted. Statuscode is the number indicating the status of command. The detailed definition will be introduced in the following sections.
+
+
 
 \section{REPO-NG DESIGN}
 
