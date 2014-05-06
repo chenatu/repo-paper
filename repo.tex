@@ -1,6 +1,6 @@
 \documentclass{acm_proc_article-sp}
 
-\usepackage{url, fancyvrb, framed}
+\usepackage{url, fancyvrb, framed, multirow}
 
 \begin{document}
 
@@ -217,6 +217,69 @@ DeleteNum             ::= DELETENUM-TYPE TLV-LENGTH
 \end{figure*}
 
 The TLV structure and meaning of Name, ProcessId, StartBlockId, and EndBlockId are just like those of RepoCommandParameter. InsertNum is the count of data inserted. DeleteNum is the count of data deleted. Statuscode is the number indicating the status of command. The detailed definition will be introduced in the following sections.
+
+\subsubsection{Repo TLV Type Encoding Number}
+
+In TLV encoding, first several bits defines the type of block. Table 1 shows the 
+
+\begin{table}[!hbp]
+\centering
+
+\begin{tabular}{l l}
+
+\hline
+type & number \\
+\hline
+RepoCommandParameter & 201 \\
+StartBlockId & 204 \\
+EndBlockId & 205 \\
+ProcessId & 206 \\
+RepoCommandResponse & 207\\
+StatusCode & 208 \\
+InsertNum & 209 \\
+DeleteNum & 210 \\
+\hline
+
+\end{tabular}
+\caption{Repo TLV Type Encoding Number}
+\end{table}
+
+
+
+\subsection{Authentication and Authorization}
+The trust model and access control of repo depends on specific implementation. The protocol does not limit type of trust model. The implementation of repo can either adopt policy based or reputation based trust model for validation the repo command interest. The protocol only requests signature and timestamp of repo command interest. Access control is also defined by implementation. Public key in signature is a good identifier for access control list.
+
+\subsection{Inserting Data}
+
+\subsubsection{Specification}
+Repo insertion command requests that the repo retrieves and stores content from requester. Validation of commands is defined by specific implementation. When the interested is validated and name of the data is not existed in the repo. The repository will response with a data object containing OK status and start to send the interest to fetch the data to insert.
+
+Segmented data insertion is also supported in the insertion protocol. Segmentation information is also defined in RepoCommandParameter.
+
+\paragraph{Structure of Repo Insertion Command}
+The name semantics follows the format of the repo command. The ``<command verb>'' is defined as ``insert''. For example, for <repo prefix> as /ucla/cs/repo, the following is an example:
+
+\begin{figure*}
+\begin{framed}
+\begin{BVerbatim}
+
+/ucla/cs/repo/insert/<RepoCommandParameter>/<timestamp>/<random-value>/<SignatureInfo>/<SignatureValue>
+
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+\paragraph{RepoCommandParameter of Insertion Command}
+RepoCommandParameter of insertion command follows TLV structure of RepoCommandParameter of repo command, but adopts only parts of sub TLV-block including, Name, Selector, StartBlockId, EndBlockId. The name section is a must section in this scenario.
+
+\begin{itemize}
+\item <Name> indicates the prefix of name of data that will be inserted into repo
+\item <command verb> refers to the name of command
+\item <RepoCommandParameter> refers to parameters of repo command
+\end{itemize}
+
+
+\subsubsection{Discuss about Specification}
 
 
 
