@@ -84,7 +84,7 @@ Four types of commands are supported in repo protocol: insertion, deletion, inse
 \subsubsection{Background}
 NDN packets are encoded in a Type-Length-Value (TLV) format. One TLV block can be nested with servral sub TLV bocks and the length of each TLV block is variable. The type of block is defined in the first few octets and the length of block is set subsequently. Wired format of name is just a sub TLV block of interest and all the components of name are nested in the name block.
 
-Repo command interests are based on signed command interests. Signed command interests are used for authentication. The signed command interests not only contain cryptographic signature, but also ensure uniqueness of each command. The following name is a typical structure of name of singed comman interest:
+Repo command interests are based on signed command interests. Signed command interests are used for authentication. The signed command interests not only contain cryptographic signature, but also ensure uniqueness of each command. The following name is a typical structure of name of singed common interest:
 
 \begin{figure*}[htbp]
 \centering
@@ -249,15 +249,16 @@ DeleteNum & 210 \\
 \subsection{Authentication and Authorization}
 The trust model and access control of repo depends on specific implementation. The protocol does not limit type of trust model. The implementation of repo can either adopt policy based or reputation based trust model for validation the repo command interest. The protocol only requests signature and timestamp of repo command interest. Access control is also defined by implementation. Public key in signature is a good identifier for access control list.
 
-\subsection{Inserting Data}
+\subsection{Inserting Data and Inserting Progress Check}
 
-\subsubsection{Specification}
 Repo insertion command requests that the repo retrieves and stores content from requester. Validation of commands is defined by specific implementation. When the interested is validated and name of the data is not existed in the repo. The repository will response with a data object containing OK status and start to send the interest to fetch the data to insert.
 
 Segmented data insertion is also supported in the insertion protocol. Segmentation information is also defined in RepoCommandParameter.
 
-\paragraph{Structure of Repo Insertion Command}
-The name semantics follows the format of the repo command. The ``<command verb>'' is defined as ``insert''. For example, for <repo prefix> as /ucla/cs/repo, the following is an example:
+Command of inserting progress check is supported. Once the check command was sent, repo will return response about the first and the last of id of segmented data and how many blocks have been inserted. If EndBlockId Missing Timeout is allowed, this check command can also reset the timer to zero.
+
+\subsubsection{Structure of Repo Insertion Command and Insertion Check Command}
+The name semantics follows the format of the repo command. The ``<command verb>'' are defined as ``insert'' and ``insert check''. For example, for <repo prefix> as /ucla/cs/repo, the following are an examples of insert and insert check command:
 
 \begin{figure*}
 \begin{framed}
@@ -269,18 +270,225 @@ The name semantics follows the format of the repo command. The ``<command verb>'
 \end{framed}
 \end{figure*}
 
-\paragraph{RepoCommandParameter of Insertion Command}
+\begin{figure*}
+\begin{framed}
+\begin{BVerbatim}
+
+/ucla/cs/repo/insert check/<RepoCommandParameter>/<timestamp>/<random-value>/<SignatureInfo>/<SignatureValue>
+
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+
+\subsubsection{RepoCommandParameter of Insertion Command}
 RepoCommandParameter of insertion command follows TLV structure of RepoCommandParameter of repo command, but adopts only parts of sub TLV-block including, Name, Selector, StartBlockId, EndBlockId. The name section is a must section in this scenario.
 
 \begin{itemize}
-\item <Name> indicates the prefix of name of data that will be inserted into repo
-\item <command verb> refers to the name of command
-\item <RepoCommandParameter> refers to parameters of repo command
+\item <Name> indicates the prefix of name of data that will be inserted into repo.
+\item <Selector> indicates the selectors of interests for repo to fetch data.
+\item <StartBlockId> indicates the first segment ID of segmented data to be inserted.
+\item <EndBlockId> indicates the last segment ID of segmented data to be inserted.
 \end{itemize}
 
+\subsubsection{RepoCommandParameter of Insertion Check Command}
+RepoCommandParameter of insertion check command follows TLV structure of RepoCommandParameter of repo command, but only and must adopt ProcessId.
 
-\subsubsection{Discuss about Specification}
+\begin{itemize}
+\item <ProcessId> is retrieved from the RepoCommandResponse of Insertion Command and it indicates the identity of the insertion progress.
+\end{itemize}
 
+\subsubsection{RepoCommandResponse of Insertion Command}
+RepoCommandResponse of insertion command follows TLV structure of RepoCommandResponse of repo. Once the interest arrives, repo will validate the command interest and check the authorization of the command. Then Repo will return the response according to the result of command validation. RepoCommandResponse of insertion adopts ProcessId, StatusCode, StartBlockId, EndBlockId, and InsertNum sections. StatusCode is the must section.
+
+\begin{itemize}
+\item <ProcessId> is generated when the interest is validated and authorized. If the response is negative
+\item <StatusCode> indicates status of insertion progress.
+\item <StartBlockId> indicates the first segment ID of segmented data to be inserted.
+\item <EndBlockId> indicates the last segment ID of segmented data to be inserted.
+\item <InsertNum> indicates how many content objects have been inserted.
+\end{itemize}
+
+\subsubsection{RepoCommandResponse of Insertion Check Command}
+RepoCommandResponse of insertion check command follows TLV structure of RepoCommandResponse of repo. Once the interest arrives, repo will validate the command interest and check the authorization of the command. Then Repo will check the insertion progress according to ProcessId. RepoCommandResponse of insertion check adopts ProcessId, StatusCode, StartBlockId, EndBlockId, and InsertNum sections. StatusCode and ProcessId are the must sections.
+
+\begin{itemize}
+\item <ProcessId> is the same with that of insertion check command.
+\item <StatusCode> indicates status of insertion progress.
+\item <StartBlockId> indicates the first segment ID of segmented data to be inserted.
+\item <EndBlockId> indicates the last segment ID of segmented data to be inserted.
+\item <InsertNum> indicates how many content objects have been inserted.
+\end{itemize}
+
+The following table shows the definition of StatusCode.
+
+\begin{table}[!hbp]
+\centering
+
+\begin{tabular}{l l}
+
+\hline
+StatusCode & Description \\
+\hline
+100 & The command is OK. can start to fetch the data \\
+200 & All the data has been inserted \\
+300 & This insertion is in progress \\
+401 & This insertion command or insertion check command is invalidated \\
+402 & Selectors and BlockId both present\\
+403 & Malformed Command \\
+404 & No such this insertion is in progress \\
+\hline
+
+\end{tabular}
+\caption{StatusCode of Insertion}
+\end{table}
+
+\subsubsection{Types of Insertion}
+There are 3 types of supported insertion: single, selector and segment.
+
+Single insertion means inserting one content object of prefix of Name into the repo. Selector, StartBlockId and EndBlockId are all not set, except Name of RepoCommandParameter.
+
+Selector insertion means inserting one content object conforming to Name as prefix and Selector. StartBlockId and EndBlockId will not be set. Name and Selector will be set.
+
+Segment insertion means inserting multiple segmented content objects into the repo. Selector will not be set. At least one of StartBlockId and EndBlockId is set.
+
+\subsubsection{EndBlockId Missing Timeout}
+If StartBlockId presents but EndBlockId is missing, and returned data packets do not contain FinalBlockId, the repo will continuously fetch the data. An EndBlockId missing timeout is set to prevent this occasion. The repo will start a timer when StartBlockId presents but EndBlockId is missing. When timeout happens, repo will stop fetching data to store and end insert process. If an insert check command arrives during this insert process, the time of timer is set to 0. If data packet containing FinalBlockId arrives, this timeout timer will be dismissed.
+
+\subsubsection{Protocol Process}
+
+Progress of Inserting Data:
+
+\begin{enumerate}
+
+\item start to authorize the command; if authorization does not fail immediately, go to step 3
+
+\item send a negative response indicating authorization failure, and abort these steps, insert process ends (StatusCode: 401)
+
+\item if both StartBlockId and EndBlockId are missing, go to step 7
+
+\item if either StartBlockId or EndBlockId is present, and one of supported selectors is present. send negative response back and abort steps, insert process ends (StatusCode: 402)
+
+\item if both StartBlockId and EndBlockId are present, and StartBlockId is less than or equal to EndBlockId, go to step 7
+
+\item send a negative response indicating malformed command, and abort these steps, insert process ends (StatusCode: 403)
+
+\item wait for authorization completion
+
+\item if authorization fails, go to step 2 (StatusCode: 401)
+
+\item send a positive response indicating insert is in progress (StatusCode: 200)
+
+\item if either StartBlockId or EndBlockId is present, go to step 16
+
+\item start to retrieve Name with selectors in insert command
+
+\item wait for retrieval completion
+
+\item if retrieval fails, go to step 27
+
+\item store retrieved Data packet
+
+\item abort these steps, insert process ends
+
+\item if StartBlockId is missing, set StartBlockId 0. If EndBlockId is missing, EndBlockId will be missing unless get FinalBlockId in coming data packets, start EndBlockId Missing Timeout timer.
+
+\item append StartBlockId to Name
+
+\item start to retrieve Name
+
+\item wait for retrieval completion
+
+\item if retrieval fails, go to step 26
+
+\item store retrieved Data packet
+
+\item if retrieved Data packet contains FinalBlockId, and FinalBlockId is less than EndBlockId or EndBlockId is missing, let EndBlockId be FinalBlockId
+
+\item if the last component of Name is greater than or equal to EndBlockId, abort these steps, insert process ends
+
+\item increment the last component of Name
+
+\item go to step 17
+
+\item retrieve data with this data another 2 times. If these 2 retrieval both fails, abort these steps. if success, go to step 20
+
+\item retrieve data with this data another 2 times. If these 2 retrieval both fails, abort these steps. if success, go to step 13
+\end{enumerate}
+
+If EndBlockId Missing Timeout timer starts, repo will monitor this timer during step 17~26. If this timeout occurs, abort insert command process immediately.
+
+Implementation MAY pipeline the Interests.
+
+Progress of Insertion Check:
+
+Implementation MAY publish a notification of status regarding insert progress. The process of insertion check is as follows:
+
+\begin{enumerate}
+
+\item start to authorize the insert status command, if fails go to 2, if success, go to 3
+
+\item send a negative response indicating authorization failure, and abort these steps (StatusCode: 401)
+
+\item start to check the progress of the insert with the data name in the command. If no such progress is found, go to 4. or go to 5.
+
+\item response status with status code, abort check process. (StatusCode: 404)
+
+\item check the status of insertion. return the status of insertion progress. If a EndBlockId Missing Timeout timer is running, set this timer to 0. About check process. (StatusCode: 300)
+
+\end{enumerate}
+
+\begin{figure*}
+\centering
+\begin{BVerbatim}
+Requester                     Repo                          Data producer
+    |                           |                                 |
+    |                           |                                 |
+  +---+  Insert command       +---+                               |
+  |   | --------------------> |   |                               |
+  +---+                       |   |                               |
+    |                         |   |                               |
+  +---+   Confirm start       |   |                               |
+  |   | <==================== |   |                               |
+  +---+   Reject command      +---+                               |
+    |     (with status code)    |                                 |
+    |                         +---+     Interest for Data       +---+
+    |                         |   | --------------------------> |   |
+    |                         +---+                             |   |
+    |                           |                               |   |
+    |                         +---+       Data segment          |   |
+    |                         |   | <========================== |   |
+    |                         +---+                             +---+
+    |                           |                                 |
+    |                           ~                                 ~
+    |                           ~                                 ~
+    |                           |                                 |
+    |                         +---+     Interest for Data       +---+
+    |                         |   | --------------------------> |   |
+    |                         +---+                             |   |
+    |                           |                               |   |
+    |                         +---+       Data segment          |   |
+    |                         |   | <========================== |   |
+    |                         +---+                             +---+
+    |                           |                                 |
+    |                           |                                 |
+    |                           ~                                 ~
+    |                           ~                                 ~
+    |                           |                                 |
+    |                           |                                 |
+    |                           |                                 |
+  +---+   Check interest      +---+                               |
+  |   | --------------------> |   |                               |
+  +---+                       |   |                               |
+    |                         |   |                               |
+  +---+    Check response     |   |                               |
+  |   | <==================== |   |                               |
+  +---+                       +---+                               |
+    |                           |                                 |
+    |                           |                                 |
+\end{BVerbatim}
+\caption{Insert and Insertion Check Progress}
+\end{figure*}
 
 
 \section{REPO-NG DESIGN}
