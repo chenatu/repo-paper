@@ -249,16 +249,16 @@ DeleteNum & 210 \\
 \subsection{Authentication and Authorization}
 The trust model and access control of repo depends on specific implementation. The protocol does not limit type of trust model. The implementation of repo can either adopt policy based or reputation based trust model for validation the repo command interest. The protocol only requests signature and timestamp of repo command interest. Access control is also defined by implementation. Public key in signature is a good identifier for access control list.
 
-\subsection{Inserting Data and Inserting Progress Check}
+\subsection{Inserting Data and Insertion Status Check}
 
 Repo insertion command requests that the repo retrieves and stores content from requester. Validation of commands is defined by specific implementation. When the interested is validated and name of the data is not existed in the repo. The repository will response with a data object containing OK status and start to send the interest to fetch the data to insert.
 
 Segmented data insertion is also supported in the insertion protocol. Segmentation information is also defined in RepoCommandParameter.
 
-Command of inserting progress check is supported. Once the check command was sent, repo will return response about the first and the last of id of segmented data and how many blocks have been inserted. If EndBlockId Missing Timeout is allowed, this check command can also reset the timer to zero.
+Command of insertion status check is supported. Once the check command was sent, repo will return response about the first and the last of id of segmented data and how many blocks have been inserted. If EndBlockId Missing Timeout is allowed, this check command can also reset the timer to zero.
 
 \subsubsection{Structure of Repo Insertion Command and Insertion Check Command}
-The name semantics follows the format of the repo command. The ``<command verb>'' are defined as ``insert'' and ``insert check''. For example, for <repo prefix> as /ucla/cs/repo, the following are an examples of insert and insert check command:
+The name semantics follows the format of the repo command. The ``<command verb>'' are defined as ``insert'' and ``insert check''. For example, for <repo prefix> as /ucla/cs/repo, the following are an examples of insertion and insertion check command:
 
 \begin{figure*}
 \begin{framed}
@@ -303,17 +303,17 @@ RepoCommandResponse of insertion command follows TLV structure of RepoCommandRes
 
 \begin{itemize}
 \item <ProcessId> is generated when the interest is validated and authorized. If the response is negative
-\item <StatusCode> indicates status of insertion progress.
+\item <StatusCode> indicates status of insertion status.
 \item <StartBlockId> indicates the first segment ID of segmented data to be inserted.
 \item <EndBlockId> indicates the last segment ID of segmented data to be inserted.
 \item <InsertNum> indicates how many content objects have been inserted.
 \end{itemize}
 
 \subsubsection{RepoCommandResponse of Insertion Check Command}
-RepoCommandResponse of insertion check command follows TLV structure of RepoCommandResponse of repo. Once the interest arrives, repo will validate the command interest and check the authorization of the command. Then Repo will check the insertion progress according to ProcessId. RepoCommandResponse of insertion check adopts ProcessId, StatusCode, StartBlockId, EndBlockId, and InsertNum sections. StatusCode and ProcessId are the must sections.
+RepoCommandResponse of insertion check command follows TLV structure of RepoCommandResponse of repo. Once the interest arrives, repo will validate the command interest and check the authorization of the command. Then Repo will check the insertion status according to ProcessId. RepoCommandResponse of insertion check adopts ProcessId, StatusCode, StartBlockId, EndBlockId, and InsertNum sections. StatusCode and ProcessId are the must sections.
 
 \begin{itemize}
-\item <ProcessId> is the same with that of insertion check command.
+\item <ProcessId> is the same with that of insertion response.
 \item <StatusCode> indicates status of insertion progress.
 \item <StartBlockId> indicates the first segment ID of segmented data to be inserted.
 \item <EndBlockId> indicates the last segment ID of segmented data to be inserted.
@@ -477,7 +477,7 @@ Requester                     Repo                          Data producer
     |                           |                                 |
     |                           |                                 |
     |                           |                                 |
-  +---+   Check interest      +---+                               |
+  +---+    Check interest     +---+                               |
   |   | --------------------> |   |                               |
   +---+                       |   |                               |
     |                         |   |                               |
@@ -487,7 +487,188 @@ Requester                     Repo                          Data producer
     |                           |                                 |
     |                           |                                 |
 \end{BVerbatim}
-\caption{Insert and Insertion Check Progress}
+\caption{Insertion and Insertion Check Progress}
+\end{figure*}
+
+\subsection{Deleting Data and Deletion Status Check}
+Deletion of one content object or multiple content objects under certain prefix are both supported. Selectors can be used in deletion but has different semantics with that of insertion.
+
+\subsubsection{Structure of Repo Deletion and Deletion Status Check Command}
+The name semantics follows the format of the repo command. The ``<command verb>'' are defined as ``delete'' and ``delete check''. For example, for <repo prefix> as /ucla/cs/repo, the following are an examples of deletion and deletion check command:
+
+\begin{figure*}
+\begin{framed}
+\begin{BVerbatim}
+
+/ucla/cs/repo/delete/<RepoCommandParameter>/<timestamp>/<random-value>/<SignatureInfo>/<SignatureValue>
+
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+\begin{figure*}
+\begin{framed}
+\begin{BVerbatim}
+
+/ucla/cs/repo/delete check/<RepoCommandParameter>/<timestamp>/<random-value>/<SignatureInfo>/<SignatureValue>
+
+\end{BVerbatim}
+\end{framed}
+\end{figure*}
+
+\subsubsection{RepoCommandParameter of Deletion Command}
+RepoCommandParameter of deletion command follows TLV structure of RepoCommandParameter of repo command, and adopts all the sub-sections. The Name and ProcessId sections are the must sections in this scenario.
+
+\begin{itemize}
+\item <ProcessId> is generated by the deletion requester and it indicates the identity of the deletion progress.
+\item <Name> indicates the prefix of name of data that will be deleted from repo.
+\item <Selector> indicates the selectors of interests for repo to deleting data.
+\item <StartBlockId> indicates the first segment ID of segmented data to be deleted.
+\item <EndBlockId> indicates the last segment ID of segmented data to be deleted.
+\end{itemize}
+
+\subsubsection{RepoCommandParameter of Deletion Check Command}
+RepoCommandParameter of deletion check command follows TLV structure of RepoCommandParameter of repo command, but only and must adopt ProcessId.
+
+\begin{itemize}
+\item <ProcessId> is that of deletion command to indicate the specific deletion progress.
+\end{itemize}
+
+
+\subsubsection{RepoCommandResponse of Deletion Command}
+RepoCommandResponse of deletion command follows TLV structure of RepoCommandResponse of repo. Once the interest arrives, repo will validate the command interest and check the authorization of the command. Then Repo will start deletion prgress. When the deletion is complished, repo will return the response. RepoCommandResponse of deletion adopts ProcessId, StatusCode, StartBlockId, EndBlockId, and DeleteNum sections. StatusCode is the must section.
+
+\begin{itemize}
+\item <ProcessId> is generated by the deletion command interest;
+\item <StatusCode> indicates status of deletion status.
+\item <StartBlockId> indicates the first segment ID of segmented data to be deleted.
+\item <EndBlockId> indicates the last segment ID of segmented data to be deleted.
+\item <DeleteNum> indicates how many content objects have been deleted.
+\end{itemize}
+
+\subsubsection{RepoCommandResponse of Deletion Check Command}
+RepoCommandResponse of deletion check command follows TLV structure of RepoCommandResponse of repo. Once the interest arrives, repo will validate the command interest and check the authorization of the command. Then Repo will check the deletion status according to ProcessId. RepoCommandResponse of deletion check adopts ProcessId, StatusCode, StartBlockId, EndBlockId, and DeleteNum sections. StatusCode and ProcessId are the must sections.
+
+\begin{itemize}
+\item <ProcessId> is the same with that of deletion command.
+\item <StatusCode> indicates status of deletion command.
+\item <StartBlockId> indicates the first segment ID of segmented data to be deleted.
+\item <EndBlockId> indicates the last segment ID of segmented data to be deleted.
+\item <DeleteNum> indicates how many content objects have been deleted.
+\end{itemize}
+
+The following table shows the definition of StatusCode.
+
+\begin{table}[!hbp]
+\centering
+
+\begin{tabular}{l l}
+
+\hline
+StatusCode & Description \\
+\hline
+200 & All the data has been deleted \\
+300 & This deletion is in progress \\
+401 & This deletion or deletion check command is invalidated \\
+402 & Selectors and BlockId both present\\
+403 & Malformed Command \\
+404 & No such this deletion  is in progress \\
+\hline
+
+\end{tabular}
+\caption{StatusCode of Deletion}
+\end{table}
+
+\subsubsection{Types of Deletion}
+There are 3 types of supported deletion: single, selector and segment.
+
+Single deletion means deleting one content object of prefix of Name from the repo. Selector, StartBlockId and EndBlockId are all not set, except Name of RepoCommandParameter.
+
+Selector deletion means deleting any content object conforming to Name as prefix and Selector. StartBlockId and EndBlockId will not be set. Name and Selector will be set.
+
+Semantics of selectors in this case is different. In this case, the selector will match any content object conforming to the selector conditions not just one content object.
+
+Segment deletion means deleting multiple segmented content objects from the repo. Selector will not be set. At least one of StartBlockId and EndBlockId is set.
+
+\subsubsection{Protocol Process}
+
+Progress of Deleting Data:
+
+\begin{enumerate}
+
+\item start to authorize the command; if authorization does not fail, go to step 3
+
+\item send a negative response indicating authorization failure, and abort these steps, end deletion process. (StatusCode: 401)
+
+\item check whether a deletion process of same RepoCommandParameter exists, waiting for deletion process ends.
+
+\item If selectors and one of StartBlockId and EndBlockId presents, send a negative response and abort these steps, end deletion process. (StatusCode: 402)
+
+\item If selectors present, go to step 8
+
+\item check whether StartBlockId or EndBlockId presents. If both presents but StartBlockId is larger than EndBlockId, return negative response and end deletion process. (StatusCode: 403) Or go to step 9
+
+\item If StartBlockId, EndBlockId and selectors are all missing, go to step 10
+
+\item delete all the data that conforms to the name and selectors, go to step 11
+
+\item delete all the data packets of segment id between StartBlockId and EndBlockId. If StartBlockId is missing, StartBlockId is set to be 0. If EndBlockId is missing, EndBlockId is set to be the largest segment id that repo holds. go to step 11
+
+\item delete data exact matches the name. got to step 11
+
+\item If lifetime of interest does not expire, return status response of positive StatusCode. If lifetime of interest has expired, wait for interest the same RepoCommandParameter and return this status response. End Deletion process. (StatusCode: 200)
+
+\end{enumerate}
+
+Client will set deletion command with big lifetime. The repo will also hold the status of deletion progress for certain time after deletion done. If life time expires, client will re-express the command to get the response.
+
+Implementation MAY publish a notification of status regarding delete progress. The process of status check is as follows:
+
+\begin{enumerate}
+
+\item start to authorize the delete status command
+
+\item send a negative response indicating authorization failure, and abort these steps (StatusCode: 401)
+
+\item start to check the progress of the delete with the data name in the command. If no such progress is found, go to 4. or go to 5.
+
+\item response status with status code of 404 (StatusCode: 404)
+
+\item check the status of delete. return the status data content (StatusCode: 300)
+
+\end{enumerate}
+
+\begin{figure*}
+\centering
+\begin{BVerbatim}
+
+Requester                     Repo 
+    |                           |                                 
+    |                           |                                 
+  +---+  Delete command       +---+                               
+  |   | --------------------> |   |                               
+  +---+                       +---+                               
+    |                           |                                 
+    |                           |                                 
+    |                           |                                 
+  +---+   Status interest     +---+                               
+  |   | --------------------> |   |                               
+  +---+                       |   |                               
+    |                         |   |                               
+  +---+    Status response    |   |                               
+  |   | <==================== |   |                               
+  +---+                       +---+                               
+    |                           |                                 
+    |                           |                                 
+    |                           |                                 
+  +---+   Confirm Deletion    +---+                               
+  |   | <==================== |   |                               
+  +---+   Reject command      +---+                               
+    |     (with status code)    |    
+    |                           |
+
+\end{BVerbatim}
+\caption{Deletion and Deletion Check Progress}
 \end{figure*}
 
 
