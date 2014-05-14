@@ -673,6 +673,48 @@ Requester                     Repo
 
 
 \section{REPO-NG DESIGN}
+Repo-ng (NDN repo of new generation) is an implementation of NDN persistent in-network storage conforming to NDN Repo protocol. It uses ndn-cxx as NDN client library and database sqlite3 as underlying data storage.
+
+\subsection{Software Structure}
+Major Modules:
+\begin{itemize}
+\item Storage: basic interfaces to handle database related operations including reading, insertion, update and deletion. It also operates on NDN packets in database according to selectors bound with interests. This module locates in src/storage directory.
+\item Handle: Handle module can handle interests or commands of different functions separately. Reading is supported in read-handle, insertion and insertion status check in write-handle and deletion and deletion status check in delete-handle. This module locates in src/handle directory.
+\item Helpers: repo command parameter, response and repo TLV formats are defined in this module.
+\item Server: The process of starting a repo is defined  including reading configuration file, initiating database, connecton to NFD and registration of prefixes.
+\item Test: unit-test and integrated tests are both supported
+\item Tool: command line tools to use repo such as tools to fetch a file from or dump a file into the repo.
+\end{itemize}
+
+\begin{figure*}
+\centering
+\begin{BVerbatim}
++------------------------------+
+|                              |
+|         Repo Server          |
+|                              |
++------------------------------+
+              ||
+              || contains
+              \/
++------------------------------+
+|                              |
+|  Interest and Command Handle |
+|  Read, Insert and Delete     |
+|                              |
++------------------------------+
+              ||
+              || uses
+              \/
++------------------------------+
+|                              |
+|       Database Handle        |
+|                              |
++------------------------------+
+
+\end{BVerbatim}
+\caption{Module Relation}
+\end{figure*}
 
 \section{EVALUTATION OF REPO-NG}
 
