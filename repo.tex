@@ -1,6 +1,6 @@
 \documentclass{acm_proc_article-sp}
 
-\usepackage{url, fancyvrb, framed, multirow}
+\usepackage{url, fancyvrb, framed, multirow, tabularx}
 
 \begin{document}
 
@@ -681,7 +681,7 @@ Major Modules:
 \item Storage: basic interfaces to handle database related operations including reading, insertion, update and deletion. It also operates on NDN packets in database according to selectors bound with interests. This module locates in src/storage directory.
 \item Handle: Handle module can handle interests or commands of different functions separately. Reading is supported in read-handle, insertion and insertion status check in write-handle and deletion and deletion status check in delete-handle. This module locates in src/handle directory.
 \item Helpers: repo command parameter, response and repo TLV formats are defined in this module.
-\item Server: The process of starting a repo is defined  including reading configuration file, initiating database, connecton to NFD and registration of prefixes.
+\item Server: The process of starting a repo is defined  including reading configuration file, initiating database, connection to NFD and registration of prefixes.
 \item Test: unit-test and integrated tests are both supported
 \item Tool: command line tools to use repo such as tools to fetch a file from or dump a file into the repo.
 \end{itemize}
@@ -715,6 +715,126 @@ Major Modules:
 \end{BVerbatim}
 \caption{Module Relation}
 \end{figure*}
+
+\subsection{Storage Design}
+Repo-ng is a demo implementation of NDN repo protocol. Thus, cross-platform and light-weight are first taken into account. Sqlite3 is chosen to be the underlying database for its well cross-platform, self-contained, serverless, and zero-configuration properties.
+
+The name of NDN packet is hierarchical. In NDN protocol, if name of interest is just a prefix or interest contains selectors, the repo will not just return data packet exactly matching the name, but also data packet with this prefix and conforming to the selectors. If name and content of data packets are just stored in the database. All the data will be traversed for each query. In our implementation, a prefix tree is stored in the database for query efficiency.
+
+DataBase Design:
+
+All the data packets are stored in one table for current implementation
+
+Columns:
+\begin{itemize}
+\item name: tlv block name of the data packets. BLOB PRIMARY KEY
+\item data: the whole TLV format data packets. BLOB
+\item parentName: TLV format prefix of name with length of name - 1. For example, if name is /a/b/c, parentName is /a/b. For root name /, its parentName is NULL. BLOB
+\item nChildren: the number of direct children of name. For example, there are row names: /a/b, /a/b/c, /a/b/d, /a/b/c/d. The nChildren of /a/b is 2, nChildren of /a/b/c is 1, nChildren of /a/b/d and /a/b/c/d is 0. INTEGER
+\end{itemize}
+
+The following figure is an example of prefix tree stored in database.
+
+\begin{figure*}
+\centering
+\begin{BVerbatim}
+                                 / 
+                                 |          
+                  +--------------+---------------+
+                /data1                         /data2
+                  |                              |         
+        +---------+---------+                    +
+    /data1/test        /data1/null          /data2/test
+        |                                        |
+        +                                        +
+/data1/test/data                          /data2/test/sound
+                                                 |
+                                    +------------+-----------+
+                           /data2/test/sound/1      /data2/test/sound/2
+
+\end{BVerbatim}
+\caption{Example of Prefix Tree}
+\end{figure*}
+
+\subsection{Trust Model}
+
+Repo will just validate repo command interest instead of validating data packet, because repo is not the data consumer and do not need to guarantee the validation of data packet. It just holds the data packet for consumer to retrieve.
+The trust model of repo-ng command interest is hierarchical. An example certificate signing hierarchy is:
+
+\begin{figure*}
+\centering
+\begin{BVerbatim}
+                          root 
+                           |          
+            +--------------+---------------+
+          site1                          site2
+            |                              |         
+  +---------+---------+                    +
+user1     user2        repo2             user3
+  |                                        |
+  +                                        +
+repo1                                    repo3
+                                           |
+                                    +------+-------+
+                                repouser1      repouser2
+
+\end{BVerbatim}
+\caption{Example Certificate Signing Hierarchy}
+\end{figure*}                                
+
+Root could be the testbed certificate of NFD testbed, or just some assigned root trust anchor. Site could be some location or some remote association. User is a member of the site.
+
+Repo certificate could be signed by site or user under some site.
+
+Entities name following the signing hierarchy, for example:
+
+\begin{table*}[!hbp]
+
+\centering
+\small
+
+\begin{tabularx}{\textwidth}{l | X | l | X}
+
+\hline
+Entity & Identity Name & Example & Certificate Name Example \\
+root & /<network> & /ndn & /ndn/KEY/ksk-1/ID-CERT/\%01 \\
+site & /<network>/<site> & /ndn/edu/ucla & /ndn/edu/ucla/KEY/ksk-2/ID-CERT/\%01 \\
+user & /<network>/<site>/<user-id> & /ndn/edu/ucla/alice & /ndn/edu/ucla/alice/KEY/ksk-3/ID-CERT/\%01 \\
+\multirow{2}{*}{repo} & /<network>/<site>/<repo-id> & /ndn/edu/ucla/pubRepo & /ndn/edu/ucla/alice/KEY/ksk-4/ID-CERT/\%01 \\
+& /<network>/<site>/user-id/<repo-id> &  /ndn/edu/ucla/alice/repo & /ndn/edu/ucla/alice/repo/KEY/ksk-5/ID-CERT/\%01 \\
+\multirow{2}{*}{repo-user} & /<network>/<site>/<repo-id>/<repo-user-id>  & /ndn/edu/ucla/pubRepo/bob & /ndn/edu/ucla/pubRepo/bob/KEY/ksk-5/ID-CERT/\%01 \\
+
+& /<network>/<site>/<user>/<repo-id>/<repo-user-id> & /ndn/edu/ucla/alice/repo/bob & /ndn/edu/ucla/alice/repo/bob/KEY/ksk-5/ID-CERT/\%01 \\
+\hline
+
+\end{tabularx}
+\caption{StatusCode of Insertion}
+\end{table*}
+
+4 levels of validation are designed for different cases. The trust anchor in the trust model determines the ``level of validation''.
+
+\begin{itemize}
+
+\item Level 1: strict - repo user signed by repo certificate and user who signed the repo certificate are valid.
+
+\item Level 2: medium - entity under the same site is valid.
+
+\item Level 3: loose - entity under the same root network is valid.
+
+\item Level 4: free - any entity is valid.
+
+\end{itemize}
+
+\subsection{Supported Features}
+Most parts of the protocol are supported in repo-ng. The following specifications are not supported in current version.
+
+\begin{itemize}
+
+\item For deletion command, if EndBlockId is null in RepoCommandParameter, repo just returns RepoCommandResponse with StatusCode 403 (Malformed Command). 
+
+\item Command for checking deletion Status
+
+\end{itemize}
 
 \section{EVALUTATION OF REPO-NG}
 
