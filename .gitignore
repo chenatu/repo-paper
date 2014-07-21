@@ -4,3 +4,8 @@
 *.aux
 *.bbl
 *.blg
+*.bak
+*eps-converted*
+*.dvi
+*.ascii
+*.out
