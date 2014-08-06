@@ -46,7 +46,7 @@ Retrieving data from repo is just like common ways of retrieving data from NDN n
 
 \subsection{Retrieving Data}
 
-  Repo registers prefixes of data objects it holds into NDN forwarding daemon (NFD) and the repo will respond the data with such prefixes. A standard interest is used to fetch content from the repo. The repo will start to search the data packet when the name of the interest matches the prefix it registered in NFD. If the data packet in repo matches the interest, it will respond with this \emph{data packet}. When the interest is not matched, it will not respond. The following figures shows the process of retrieving data.
+Repo registers prefixes of data objects it holds into NDN forwarding daemon (NFD) and the repo will respond the data with such prefixes. A standard interest is used to fetch content from the repo. The repo will start to search the data packet when the name of the interest matches the prefix it registered in NFD. If the data packet in repo matches the interest, it will respond with this \emph{data packet}. When the interest is not matched, it will not respond. The following figures shows the process of retrieving data.
 
 \begin{figure}
 \centering
@@ -619,6 +619,8 @@ Index offers fast query of interest in memory. When an interest comes to repo, r
 In current repo-ng design, the data structure of repo-index is skip list. \cite{pugh1990skip} Although skip list, Btree and other balanced tree all have O(n) query and insertion complexity, skip list has very low inherent constant-factor overheads. Besides, operations of skiplist are much easier to implement.
 
 
+Repo-ng adopts in-memory index, so when the repo restarts, it will rebuild from sqlite3 database file.
+
 \subsection{Supported Repo Protocol Features}
 Most parts of the protocol are supported in repo-ng. The following features are not supported in current version.
 
@@ -637,6 +639,69 @@ Most parts of the protocol are supported in repo-ng. The following features are 
 Command Interest and Data Packet can both be validated by repo-ng. Whether or not validating is an option that can be configured. However, validation of command interest is highly recommended. In repo-ng implementation, ``validator-config'' which is part of NDN basic library ``ndn-cxx'' is used as validator. The configuration file follows the format of validconf. \cite{validconf}
 
 \subsubsection{Access Control}
+When a command interest is coming, each interest would be matched in Access Control List (ACL) to interest one by one, the best-matched rele is found. The design of ACL is referred to the format of validconf \cite{validconf}. Filter and checker are also defined in one rule. First, filter will check the prefix of the command interest to match the rule. Then filter will check the authorization of this filter according to the checker.
+
+Here is an example of the rule.
+
+\begin{figure}[!hbp]
+\begin{framed}
+\begin{BVerbatim}
+rule
+{
+  filter
+  {
+    name /localhost/example
+    relation is-prefix-of
+  }
+  checker
+  {
+    {
+      name /localhost/example
+      relation is-prefix-of
+      auth wd
+    }
+  }
+}
+
+rule
+{
+  for interest
+  filter
+  {
+    name /localhost/example
+    relation is-prefix-of
+  }
+  checker
+  {
+    {
+      name /localhost/example
+      relation is-prefix-of
+      auth wd
+    }
+  }
+}
+
+\end{BVerbatim}
+\end{framed}
+\end{figure}
+
+There are 3 kinds of relations in the filter.
+
+\begin{enumerate}
+\item equal: The repo prefix of command interest is equal to filter.
+\item is-strict-prefix-Of: The filter is prefix of but not equal to the repo prefix.
+\item is-prefix-of: The filter is prefix of the repo prefix.
+\end{enumerate}
+
+The priority is equal > is-strict-prefix-Of > is-prefix-of.
+
+The rule would be sorted according to the name in the filter in canonical order. If the name is the same, rule would be sorted according to the priority of the relation. Command interest will match the filter of the advanced rule.
+
+Checker will check the authorization of the command interest for certain prefix of data. Checker will extract the name in repo command parameter. If the data name match the checker, the interest would have the authorization in auth section.
+
+There are 2 kind of authorization: w, d. W means the command could insert data of this prefix. D means the command could remove data of this prefix from repo.
+
+If command interest does not fit and filter or any checker, it means command interest has no access to the repo.
 
 \subsection{Congestion Control}
 In process of insertion, after repo receiving the insertion command for segmented data, it will send multiple interests for data packets. If these interests are sent in a burst, the round trip time will be large for some interests and it is difficult to set interest lifetime. So congestion control is necessary.
@@ -644,6 +709,8 @@ In process of insertion, after repo receiving the insertion command for segmente
 A basic credit based congestion control is implemented for insertion command. There is credit number to count the waiting interest request. Once an interest is sent, the credit minus one and if an interest is satisfied by one data. If credit is equal or less than 0, the repo stops sending interests. The original credit number could be adjusted according to the count of interest on the wire.
 
 In addition, if an interest is timeout. The same interest could be retransmitted for certain times that can be configured. The retransmitted interest will not subtract the credit.
+
+Besides, our performance test tool ndnputpacket which put certain mount of packets of assigning size into the repo, also adopts this congestion control solution.
 
 The flow chart of this congestion control is as follows:
 
@@ -657,43 +724,99 @@ The flow chart of this congestion control is as follows:
 
 In this section, the performance of repo-ng including is evaluated. The speed of data fetching, insertion and deletion of data packets are measured. In addition, comparison between repo-ng over NFD platform and ccnr over ccnd platform are conducted.
 
-Tests are conducted on different hardware platforms:
-\begin{itemize}
-\item Macbook Pro with 2.9 GHz Intel Core i7 processor, 8GB memory, 500GB hard drive with 7200r/min, Ethernet Card brandwidth.
-\item Raspberry Pi:
-\end{itemize}
+Tests are conducted on the following hardware platform:
+
+HP Z220 worksatation with 3.4 GHz Intel Core i7 processor of 8 cores, 16GB memory, 2T hard drive with 7200rpm, Ethernet Card 1000Mbps.
+Lenovo notebook with with 1.74GHz Intel Core i3 processor of 2 cores, 2GB memory, 500G hard drive with 7200rpm, Ethernet Card 1000Mbps.
 
 Software platform:
 For repo-ng, it is developed by ndn-cxx \cite{ndn-cxx} which is NDN C++ library with eXperimental eXtensions. The forwarding deamon of repo-ng is NFD. \cite{NFD} Ccnr uses ccnd \cite{ccnd} as forwarding deamon. All the software runs on Ubuntu 13.10.
 
 \subsection{Local Access}
 
-Repo-ng and ccnr both supports retrieving and inserting data packets, but repo-ng also supports deleting data packets from repo. In this section, all the operations are tested on one hosts. The following are scenarios of tests:
+Repo-ng and ccnr both supports retrieving and inserting data packets, but repo-ng also supports deleting data packets from repo. In this section, all the operations are tested on one hosts. The data packets are directly generated in memory to avoid hard drive I/O overhead. Access control is not configured. The following are scenarios of tests:
 
-\begin{enumerate}
-\item On Macbook
-\begin{enumerate}
-\item Comparison between repo-ng and ccnr. First, put 2000 data packets with 1200 bytes of data content. Then retrieve 1000 data packets. For repo-ng, comparison between interest with selector of LeftmostChild and RightmostChild.
-\item Comparison between repo-ng and ccnr. First, put 20,000 data packets with 1200 bytes of data content. Then retrieve 10,000 data packets. For repo-ng, comparison between interest with selector of LeftmostChild and RightmostChild.
-\item Comparison between repo-ng (with and without validation) and ccnr. Put 2,000 data packets with 1200 bytes of data content in a clean repo
-\item Comparison between repo-ng (with and without validation) and ccnr. Put 20,000 data packets with 1200 bytes of data content in a clean repo
-\item Just repo-ng, with and without validation. First, put 20,000 data packets with 1200 bytes of data content. Then delete all the data packets.
-\item Just repo-ng. First, put 20,000 data packets with 1200 bytes of data content. Then shut down the repo and rebuild
-\item Just repo-ng, with and without validation, insert 100, 500, 1000, 2000, 5000, 10,000 data packets with 1200 bytes of data content in a clean repo. Watch timeout to test congestion control.
+\begin{enumerate}[a]
+\item Put $10^3$, $10^4$, $10^5$, $10^6$ data packets with 1200 bytes of data content into a clean repo-ng. Validation is off.
+\item Put $10^3$ data packets with $10^3$. Insert commands into a clean repo-ng with and without validation.
+\item Retrieve $10^3$, $10^4$, $10^5$, $10^6$ data packets from repo-ng which carries $10^3$, $10^4$, $10^5$, $10^6$ data packets of 1200Bits.
+\item Remove $10^3$, $10^4$, $10^5$, $10^6$ data packets from repo-ng which carries $10^3$, $10^4$, $10^5$, $10^6$ data packets of 1200Bits. Validation is off.
+\item Rebuild index from $10^3$, $10^4$, $10^5$, $10^6$ data packets from database file.
+\item Put $10^3$, $10^4$, $10^5$, $10^6$ data packets with 1200 bytes of data content into a clean ccnr.
+\item Retrieve $10^3$, $10^4$, $10^5$, $10^6$ data packets from ccnr which carries $10^3$, $10^4$, $10^5$, $10^6$ data packets of 1200Bits.
 \end{enumerate}
-\item On Raspberry Pi: same tests from 1-a to 1-g
-\end{enumerate}
+
+Table 4 shows the results of repo-ng speed from case a to case e. The unit of result is MBps. ``put -s'' and ``put-s-v'' mean insert commands into a clean repo-ng with and without validation
+
+\begin{table}
+\centering
+\begin{tabular}{ | c | c | c | c | c | c | c | }
+    \hline
+           & put & get & remove & rebuild & put-s & put-s-v \\ \hline
+    $10^3$ & 0.692 & 16.881 & 15.584 & 120 & 0.041 & 0.038  \\ \hline
+    $10^4$ & 0.715 & 16.585 & 25.974 & 153.846 & & \\ \hline
+    $10^5$ & 0.719 & 16.634 & 29.843 & 158.521 & & \\ \hline
+    $10^6$ & 0.713 & 12.918 & 26.266 & 95.610 & &\\ \hline
+\end{tabular}
+\caption{Local Access of Repo-ng}
+\end{table}
+
+Table 5 shows the the results of ccnr speed from case f to case g
+
+\begin{table}
+\centering
+\begin{tabular}{ | c | c | c | }
+    \hline
+           & put & get \\ \hline
+    $10^3$ & 1.336 & 0.869 \\ \hline
+    $10^4$ & 8.778 & 4.180 \\ \hline
+    $10^5$ & 24.995 & 13.258 \\ \hline
+    $10^6$ & 28.323 & 18.266 \\ \hline
+\end{tabular}
+\caption{Local Access of Ccnr}
+\end{table}
+
+Table 4 and 5 shows the comparison of throughput between repo-ng and ccnr. The speed of insertion of ccnr is far more higher than that of repo-ng. One of main reason is the underlying storage of these systems. The storage of ccnr is rather simple by appending new content objects in the ccnr file. In repo-ng design, it would support more complex query (selector) of data packets, so it adopts structured storage database. The process of database insertion is far more complex than just appending a file. The speed of fetching is comparable between repo-ng and ccnr. As we notice that, the speed of fetching drops a little as the mounts of packet grows. The index of repo-ng is based on skiplist. It will took more time when index gets larger. Besides, query of database will get slower when data gets larger.
+
+Table 4 also shows the speed of possessing multiple commands. It takes 29.468s and 31.619s to possess 1000 insetion commands with and without validation. The time cost of insertion data packets into database could be dismissed. It takes about 30ms to possess a command locally. In our validation case, the repo-ng directly validated commands and data packets using the local certificate file. As we can see, the time cost of validation is rather low.
 
 \subsection{Network Access}
-In this case, two hosts are directly connected. Two topology are tested:
-\begin{enumerate}
-\item Macbook connected to Macbook
-\item Macbook (as client) connected to Raspberry Pi (as server)
-All the test cases are the same as those of last section from 1-a to 1-g.
-\end{enumerate}
+HP Z220 and the notebook are directly connected. Notebook works as client and repo-ng runs on HP Z220. Case a to case d in local access section are tested as table 6 shows.
 
+\begin{table}
+\centering
+\begin{tabular}{ | c | c | c | c | c | c | }
+    \hline
+           & put & get & remove & put-s & put-s-v \\ \hline
+    $10^3$ & 0.396 & 2.230 & 8.053 & 0.033 & 0.032  \\ \hline
+    $10^4$ & 0.423 & 3.490 & 21.898 & & \\ \hline
+    $10^5$ & 0.0.424 & 3.476 & 24.964 & & \\ \hline
+\end{tabular}
+\caption{Local Access of Ccnr}
+\end{table}
+
+Compared with local access, the speed drops due to the network latency between the two hosts. However, we can see a great speed drop on retrieving data packets. Different resources of client and repo are tested to track down the performance bottleneck. We see that the  load of client CPU usage is up to 70\%. This is caused by the process of inserting data. When inserting data into the repo, repo will issues multiple interests for each data packet. The possessing of these interests would be a great load for the low hardware setting notebook.
+
+Repo-ng is just one-thread process for now. There is some inefficiency to serve multiple client. For data retrieval, the cost of possessing each interest is little, so this one-thread design would not impact much. However, insertion or removal of large mount of data packets would block the repo-ng process for a certain time, while repo-ng cannot possess other data handle requests during this time.  Therefore, a time-cost process may cost congestion. Multi-thread or other types of asynchronous design should be adopted in future.
+
+\section{Functional Evaluation}
+
+Ccnr just supports local data fetching and inserting. Compared to ccnr, repo-ng of NDN supports more functions listed as below.
+
+\begin{itemize}
+\item Local and remote data retrieval, insertion and removal of repo with certain name.
+\item Status check of data insertion and removal.
+\item More complex data possessing including segmented data and interest with selectors.
+\item Authorization and Access Control. Repo-ng could validates command and data packets according to users' configuration. Access control can also be supported by user defined policy.
+\end{itemize}
 
 \section{CONCLUSION AND FUTURE WORK}
+
+In this paper, the protocol of NDN repo is demonstrated and an implementation of NDN protocol, repo-ng is developed. Compared to CCNx Repository Protocols, NDN repo supports more functions and provides validation and access control. The design of repo-ng is demonstrated and evaluation shows the efficiency between ccnr and repo-ng. Although repo-ng is less efficient in simple data packets retrieval and insertion, it provides more functions especially remote operations.
+
+NDN Repo protocol is a rather simple protocol which just supports one-to-one operation. Control over repos with same name prefix is less efficient. Besides, protocol of synchronization among different repos is necessary for applications like online chat.
+
+Repo-ng is one-thread process for now and this would cost request congestion when each request costs too much time. Mutti-thread and request waiting queue would be developed in future to optimize the performance.
 
 \bibliographystyle{abbrv}
 \bibliography{repo}
